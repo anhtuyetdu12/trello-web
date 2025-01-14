@@ -21,7 +21,8 @@ import { arrayMove } from '@dnd-kit/sortable'
 
 import Column from './ListColumns/Column/Column'
 import Card from './ListColumns/Column/ListCards/Card/Card'
-import { cloneDeep } from 'lodash'
+import { cloneDeep, isEmpty } from 'lodash'
+import { generatePlaceholderCard } from '~/utils/formatters'
 
 const ACTIVE_DRAG_ITEM_TYPE = {
   COLUMN: 'ACTIVE_DRAG_ITEM_COLUMN',
@@ -84,12 +85,17 @@ function BoardContent({ board }) {
         //xoa card ra khoi column
         nextActiveColumn.cards = nextActiveColumn.cards.filter(card => card._id !== activeDragingCradId)
 
+        //them placeholder rong : bi keo het card di, kh con cai nao nua
+        if (isEmpty(nextActiveColumn.cards)) {
+          nextActiveColumn.cards = [generatePlaceholderCard(nextActiveColumn)]
+        }
         //cap nhat mang
         nextActiveColumn.cardOrderIds = nextActiveColumn.cards.map(card => card._id)
       }
+
       //columnn moi
       if (nextOverColumn) {
-        //
+        //ktra card dang keo co ton tai o overcolumn chua
         nextOverColumn.cards = nextOverColumn.cards.filter(card => card._id !== activeDragingCradId)
         //cap nhat lai chuan dlieu columnId trong card sau khi keo giua 2 colum khac nhau
         const rebuild_activeDragingCardData = {
@@ -98,9 +104,13 @@ function BoardContent({ board }) {
         }
         //theem vao vtri moi
         nextOverColumn.cards = nextOverColumn.cards.toSpliced(newCardIndex, 0, rebuild_activeDragingCardData)
+
+        //xoa cai placholder card di neu no dang ton tai
+        nextOverColumn.cards = nextOverColumn.cards.filter(card => !card.FE_PlaceholderCard)
+
+        //cap nhat lai mang cho chuan dl
         nextOverColumn.cardOrderIds = nextOverColumn.cards.map(card => card._id)
       }
-
       return nextColumns
     })
   }
@@ -238,23 +248,26 @@ function BoardContent({ board }) {
 
     //tim cac diem giao nhau , va cham voi con tro
     const pointerIntersections = pointerWithin(args)
-    //Thuat toan phat hien va cham tra ve 1 mang va cac va cham o day
-    const intersections = !!pointerIntersections?.length
-      ? pointerIntersections
-      : rectIntersection(args)
+    // console.log('pointerIntersections: ', pointerIntersections)
+    if (!pointerIntersections?.length) return
 
-    let overId = getFirstCollision(intersections, 'id')
+    //Thuat toan phat hien va cham tra ve 1 mang va cac va cham o day (kh can nua)
+    // const intersections = !!pointerIntersections?.length
+    //   ? pointerIntersections
+    //   : rectIntersection(args)
+
+    let overId = getFirstCollision(pointerIntersections, 'id')
     if (overId) {
       const checkColumn = orderedColumn.find(column => column._id === overId)
       if (checkColumn) {
-        console.log('overid before; ',overId )
-        overId = closestCenter({
+        // console.log('overid before; ', overId )
+        overId = closestCorners({
           ...args,
           droppableContainers: args.droppableContainers.filter(container => {
             return (container.id !== overId) && (checkColumn?.cardOrderIds?.includes(container.id))
           })
         })[0]?.id
-        console.log('overid after; ',overId )
+        // console.log('overid after; ', overId )
 
       }
 
