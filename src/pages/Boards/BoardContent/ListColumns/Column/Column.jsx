@@ -22,6 +22,7 @@ import { useState } from 'react'
 import { mapOrder } from '~/utils/sorts'
 import ListCards from './ListCards/ListCards'
 import CloseIcon from '@mui/icons-material/Close'
+import { toast } from 'react-toastify'
 
 
 function Column({ column }) {
@@ -57,7 +58,7 @@ function Column({ column }) {
   const [newCardTitle, setNewCardTitle] = useState('')
   const addNewCard = () => {
     if (!newCardTitle) {
-      // console.error('please enter Card title')
+      toast.error('please enter Card title', {position: 'bottom-right'})
       return
     }
     // console.log(newCardTitle)
