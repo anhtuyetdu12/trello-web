@@ -25,7 +25,7 @@ import CloseIcon from '@mui/icons-material/Close'
 import { toast } from 'react-toastify'
 
 
-function Column({ column }) {
+function Column({ column, createNewCard }) {
   // keotha
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column._id,
@@ -56,13 +56,19 @@ function Column({ column }) {
   const toggleOpenNewCardForm = () => setOpenNewCardForm(!openNewCardForm)
 
   const [newCardTitle, setNewCardTitle] = useState('')
-  const addNewCard = () => {
+
+  const addNewCard = async() => {
     if (!newCardTitle) {
-      toast.error('please enter Card title', {position: 'bottom-right'})
+      toast.error('please enter Card title', { position: 'bottom-right' })
       return
     }
-    // console.log(newCardTitle)
+    // Tao dlieu Card de goi API
+    const newCardData = {
+      title: newCardTitle,
+      columnId: column._id
+    }
     //goi API...
+    await createNewCard(newCardData)
 
     //dong trang thai
     toggleOpenNewCardForm()
@@ -178,7 +184,7 @@ function Column({ column }) {
                 size='small'
                 variant="outlined"
                 autoFocus
-                data-no-dnd = "true"  // kh cho keo tha
+                data-no-dnd = "true" // kh cho keo tha
                 value={newCardTitle}
                 onChange={(e) => setNewCardTitle(e.target.value)}
 
