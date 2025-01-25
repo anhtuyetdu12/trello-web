@@ -1,34 +1,41 @@
-import Box from '@mui/material/Box'
-import ListColumns from './ListColumns/ListColumns'
-import { mapOrder } from '~/utils/sorts'
 import {
   DndContext,
+  DragOverlay,
+  closestCorners,
+  defaultDropAnimationSideEffects,
+  // rectIntersection,
+  getFirstCollision
+  // closestCenter
+  ,
+  pointerWithin,
   // PointerSensor,
   // MouseSensor,
   // TouchSensor,
   useSensor,
-  useSensors,
-  DragOverlay,
-  defaultDropAnimationSideEffects,
-  closestCorners,
-  pointerWithin,
-  // rectIntersection,
-  getFirstCollision
-  // closestCenter
+  useSensors
 } from '@dnd-kit/core'
-import { useEffect, useState, useCallback, useRef } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
+import Box from '@mui/material/Box'
+import { cloneDeep, isEmpty } from 'lodash'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { MouseSensor, TouchSensor } from '~/customLibraries/DndKitSensors'
+import { generatePlaceholderCard } from '~/utils/formatters'
 import Column from './ListColumns/Column/Column'
 import Card from './ListColumns/Column/ListCards/Card/Card'
-import { cloneDeep, isEmpty } from 'lodash'
-import { generatePlaceholderCard } from '~/utils/formatters'
-import { MouseSensor, TouchSensor } from '~/customLibraries/DndKitSensors'
+import ListColumns from './ListColumns/ListColumns'
 const ACTIVE_DRAG_ITEM_TYPE = {
   COLUMN: 'ACTIVE_DRAG_ITEM_COLUMN',
   CARD: 'ACTIVE_DRAG_ITEM_CARD'
 }
 
-function BoardContent({ board, createNewColumn, createNewCard }) {
+function BoardContent({
+  board,
+  createNewColumn,
+  createNewCard,
+  moveColumns,
+  moveCardInTheSameColumn,
+  moveCardToDifferentColumn
+}) {
   // const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
   const mouseSensors = useSensor(MouseSensor, { activationConstraint: { distance: 10 } })
   const touchSensors = useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 500 } })
@@ -47,7 +54,7 @@ function BoardContent({ board, createNewColumn, createNewCard }) {
   const lastOverId = useRef(null)
 
   useEffect(() => {
-    const orderedColumns = mapOrder(board?.columns, board?.columnOrderIds, '_id')
+    const orderedColumns = (board.columns)
     setOrderedColumns(orderedColumns)
   }, [board])
 
@@ -55,7 +62,7 @@ function BoardContent({ board, createNewColumn, createNewCard }) {
     return orderedColumn.find(column => column?.cards?.map(card => card._id)?.includes(cardId) )
   }
 
-  //Function xly : Cap nhat lai state trong trg hop di chuyen card giua cac column khac nhau
+  // khoi tao Function chung : Cap nhat lai state trong trg hop di chuyen card giua cac column khac nhau
   const moverCardBetweenDifferentColumns = (
     overColumn,
     overCardId,
@@ -63,7 +70,8 @@ function BoardContent({ board, createNewColumn, createNewCard }) {
     over,
     activeColumn,
     activeDragingCradId,
-    activeDragingCardData
+    activeDragingCardData,
+    triggerFrom
   ) => {
     setOrderedColumns(prevColumns => {
       const overCardIndex = overColumn?.cards?.findIndex(card => card._id === overCardId)
@@ -110,6 +118,16 @@ function BoardContent({ board, createNewColumn, createNewCard }) {
         //cap nhat lai mang cho chuan dl
         nextOverColumn.cardOrderIds = nextOverColumn.cards.map(card => card._id)
       }
+
+      //Neu function nay duoc goi tu handleDragEnd nghia la da keo tha xong
+      if ( triggerFrom === 'handleDragEnd') {
+        moveCardToDifferentColumn(
+          activeDragingCradId,
+          oldColumnWhenDragingCard._id,
+          nextOverColumn._id,
+          nextColumns
+        )
+      }
       return nextColumns
     })
   }
@@ -152,7 +170,8 @@ function BoardContent({ board, createNewColumn, createNewCard }) {
         over,
         activeColumn,
         activeDragingCradId,
-        activeDragingCardData
+        activeDragingCardData,
+        'handleDragOver'
       )
     }
 
@@ -187,7 +206,8 @@ function BoardContent({ board, createNewColumn, createNewCard }) {
           over,
           activeColumn,
           activeDragingCradId,
-          activeDragingCardData
+          activeDragingCardData,
+          'handleDragEnd'
         )
       } else {
       //Hanh dong keo tha card cung 1 column
@@ -195,16 +215,21 @@ function BoardContent({ board, createNewColumn, createNewCard }) {
         const newCardIndex = overColumn?.cards?.findIndex(c => c._id === overCardId) //lay vitri moi tu overColumn
 
         const dndOderedCards = arrayMove(oldColumnWhenDragingCard?.cards, oldCardIndex, newCardIndex)
+
+        const dndOrderedCardIds = dndOderedCards.map(card => card._id)
+
         setOrderedColumns(prevColumns => {
           const nextColumns = cloneDeep(prevColumns)
           //Tim cl dang tha
           const targetColumn = nextColumns.find(column => column._id === overColumn._id)
           //cap nhat lai gtri moi
           targetColumn.cards = dndOderedCards
-          targetColumn.cardOrderIds = dndOderedCards.map(card => card._id)
+          targetColumn.cardOrderIds = dndOrderedCardIds
           //tra ve gia trij state moi chuan vtri
           return nextColumns
         })
+
+        moveCardInTheSameColumn(dndOderedCards, dndOrderedCardIds, oldColumnWhenDragingCard._id )
 
       }
     }
@@ -219,11 +244,13 @@ function BoardContent({ board, createNewColumn, createNewCard }) {
 
         //dung arrayMove de sap xep lai mang ban dau
         const dndOderedColumns = arrayMove(orderedColumn, oldColumnIndex, newColumnIndex)
-        //2 cais clg nay de goi API
-        // const dndOderedColumnsIds = dndOderedColumns.map(c => c._id)
-        // console.log('dndOderedColumns: ', dndOderedColumns)
-        // console.log('dndOderedColumnsIds: ', dndOderedColumnsIds)
-        setOrderedColumns(dndOderedColumns) // cap nhat lai state ban dau sau khi keo tha
+
+        //Van goi update State o day de tranh delay or Flickering giao dien luc keo tha can phai cho goi API
+        setOrderedColumns(dndOderedColumns)
+
+        //goi len props function moveColumns
+        moveColumns(dndOderedColumns)
+
       }
 
     }

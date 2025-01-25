@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ContentCopy, ContentPaste } from '@mui/icons-material'
 import AddCardIcon from '@mui/icons-material/AddCard'
+import CloseIcon from '@mui/icons-material/Close'
 import Cloud from '@mui/icons-material/Cloud'
 import ContentCut from '@mui/icons-material/ContentCut'
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
@@ -19,10 +20,8 @@ import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import * as React from 'react'
 import { useState } from 'react'
-import { mapOrder } from '~/utils/sorts'
-import ListCards from './ListCards/ListCards'
-import CloseIcon from '@mui/icons-material/Close'
 import { toast } from 'react-toastify'
+import ListCards from './ListCards/ListCards'
 
 
 function Column({ column, createNewCard }) {
@@ -49,7 +48,7 @@ function Column({ column, createNewCard }) {
     setAnchorEl(null)
   }
   // sxep card
-  const orderedCards = mapOrder(column?.cards, column?.cardOrderIds, '_id')
+  const orderedCards = column.cards
 
   const [openNewCardForm, setOpenNewCardForm] = useState(false)
 
@@ -57,7 +56,7 @@ function Column({ column, createNewCard }) {
 
   const [newCardTitle, setNewCardTitle] = useState('')
 
-  const addNewCard = async() => {
+  const addNewCard = () => {
     if (!newCardTitle) {
       toast.error('please enter Card title', { position: 'bottom-right' })
       return
@@ -68,7 +67,7 @@ function Column({ column, createNewCard }) {
       columnId: column._id
     }
     //goi API...
-    await createNewCard(newCardData)
+    createNewCard(newCardData)
 
     //dong trang thai
     toggleOpenNewCardForm()
